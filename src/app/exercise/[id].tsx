@@ -22,6 +22,11 @@ type SubmissionWithStudent = Submission & { profiles: Pick<Profile, 'full_name' 
 
 const BUCKET = 'lms-files';
 
+const storagePath = (url: string) => {
+  const i = url.indexOf(`/${BUCKET}/`);
+  return i >= 0 ? decodeURIComponent(url.slice(i + BUCKET.length + 2).split('?')[0]) : url;
+};
+
 export default function ExerciseScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [loading, setLoading] = useState(true);
@@ -150,6 +155,9 @@ function StudentView({ exercise, userId }: { exercise: Material; userId: string 
       let file_url = submission?.file_url ?? null;
       let file_name = submission?.file_name ?? null;
       if (file) {
+        if (submission?.file_url) {
+          await supabase.storage.from(BUCKET).remove([storagePath(submission.file_url)]);
+        }
         file_url = await uploadFile(`submissions/${exercise.id}/${userId}`, file);
         file_name = file.name;
       }
@@ -173,6 +181,41 @@ function StudentView({ exercise, userId }: { exercise: Material; userId: string 
     } finally {
       setSaving(false);
     }
+  };
+
+  const unsubmit = () => {
+    if (!submission) return;
+    Alert.alert(
+      'Unsubmit work',
+      'Remove your submission? Your attached file will also be deleted.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Unsubmit',
+          style: 'destructive',
+          onPress: async () => {
+            setSaving(true);
+            try {
+              if (submission.file_url) {
+                await supabase.storage.from(BUCKET).remove([storagePath(submission.file_url)]);
+              }
+              const { error } = await supabase
+                .from('submissions')
+                .delete()
+                .eq('id', submission.id);
+              if (error) throw error;
+              setSubmission(null);
+              setFile(null);
+              Alert.alert('Unsubmitted', 'Your submission has been removed.');
+            } catch (e: any) {
+              Alert.alert('Error', e.message ?? 'Could not unsubmit');
+            } finally {
+              setSaving(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (loading) {
@@ -249,7 +292,7 @@ function StudentView({ exercise, userId }: { exercise: Material; userId: string 
 
           {!locked && (
             <>
-              <TouchableOpacity style={styles.secondaryBtn} onPress={pick}>
+              <TouchableOpacity style={styles.secondaryBtn} onPress={pick} disabled={saving}>
                 <Text style={styles.secondaryText}>
                   {file || submission?.file_url ? 'Replace File' : 'Attach File'}
                 </Text>
@@ -267,6 +310,15 @@ function StudentView({ exercise, userId }: { exercise: Material; userId: string 
                   </Text>
                 )}
               </TouchableOpacity>
+              {submission && (
+                <TouchableOpacity
+                  style={[styles.dangerBtn, saving && styles.disabled]}
+                  onPress={unsubmit}
+                  disabled={saving}
+                >
+                  <Text style={styles.dangerText}>Unsubmit</Text>
+                </TouchableOpacity>
+              )}
             </>
           )}
         </View>
@@ -492,7 +544,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 14,
+    marginTop: 12,
   },
   primaryText: { color: '#fff', fontWeight: '700', fontSize: 16 },
   secondaryBtn: {
@@ -504,6 +556,14 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   secondaryText: { color: '#4F46E5', fontWeight: '600', fontSize: 15 },
+  dangerBtn: {
+    backgroundColor: '#FEE2E2',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  dangerText: { color: '#DC2626', fontWeight: '600', fontSize: 15 },
   disabled: { opacity: 0.6 },
   linkBtn: { marginTop: 12 },
   linkText: { color: '#4F46E5', fontSize: 14, fontWeight: '600', marginTop: 6 },

@@ -1,56 +1,57 @@
-# Welcome to your Expo app 👋
+# Mobile LMS (Presentation & Exercise Storage App)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A cross-platform mobile Learning Management System (LMS) built with **React Native (Expo)** and **Supabase**. Designed to streamline classroom file sharing and coursework tracking, allowing instructors to distribute presentation decks and assign exercises while students enroll via join codes, submit work, and view grades.
 
-## Get started
+---
 
-1. Install dependencies
+## Features
 
-   ```bash
-   npm install
-   ```
+### Authentication & Role Management
+- **Email & Password Authentication:** Powered by Supabase Auth with persistent sessions via `AsyncStorage`.
+- **Role-Based Access:** Supports distinct **Instructor** and **Student** workflows automatically provisioned via database triggers upon sign-up.
 
-2. Start the app
+### Instructor Workflow
+- **Class Creation:** Create courses with auto-generated, unique 6-character join codes.
+- **Presentation Storage:** Upload `.ppt`, `.pptx`, and `.pdf` lecture slides directly to Supabase Storage (`lms-files`).
+- **Exercise Management:** Create assignments with detailed instructions, max score limits, and native date/time deadline pickers.
+- **Grading & Feedback:** Review student text answers and attached files, assign numeric scores, and provide written feedback.
 
-   ```bash
-   npx expo start
-   ```
+### Student Workflow
+- **Quick Enrollment:** Join classes using a 6-character course code.
+- **Dashboard Overview:** View enrolled courses alongside upcoming due exercises sorted by deadline.
+- **Lecture Access:** One-tap viewing and downloading of uploaded presentation files.
+- **Exercise Submission:** Submit text responses and/or attach supporting files, track submission status (`Pending`, `Submitted`, `Late`, `Graded`), and view instructor feedback.
 
-In the output, you'll find options to open the app in a
+---
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Tech Stack
 
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+- **Frontend Framework:** React Native, Expo (SDK 58), Expo Router, TypeScript
+- **Backend & Database:** Supabase (PostgreSQL)
+- **Authentication & Storage:** Supabase Auth & Supabase Storage
+- **Native Modules:** `expo-document-picker`, `expo-linking`, `@react-native-community/datetimepicker`, `@react-native-async-storage/async-storage`
 
-## Get a fresh project
+---
 
-When you're ready, run:
+## Project Structure
 
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
-
-### Other setup steps
-
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```text
+lms-app/
+├── schema.sql                  # PostgreSQL schema, triggers, and storage bucket setup
+├── src/
+│   ├── app/
+│   │   ├── (auth)/
+│   │   │   └── login.tsx       # Sign In / Sign Up screen with role toggle
+│   │   ├── (tabs)/
+│   │   │   └── index.tsx       # Role-based dashboard & class management modals
+│   │   ├── course/
+│   │   │   └── [id].tsx        # Subject workspace (Presentations & Exercises tabs)
+│   │   ├── exercise/
+│   │   │   └── [id].tsx        # Exercise submission (Student) & grading (Instructor)
+│   │   ├── _layout.tsx         # Root navigation stack & auth route guard
+│   │   └── index.tsx           # Root redirect entry point
+│   ├── lib/
+│   │   └── supabase.ts         # Supabase client configuration
+│   └── types/
+│       └── database.ts         # Shared TypeScript interfaces
+└── .env                        # Environment variables (excluded from version control)

@@ -29,6 +29,11 @@ const genCode = () => {
 const fmtDate = (d: string) =>
   new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
+const storagePath = (url: string) => {
+  const i = url.indexOf('/lms-files/');
+  return i >= 0 ? decodeURIComponent(url.slice(i + 11).split('?')[0]) : url;
+};
+
 export default function Dashboard() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -192,6 +197,32 @@ export default function Dashboard() {
     load();
   };
 
+  const deleteCourse = (course: Course) =>
+    Alert.alert('Delete course', `Delete "${course.title}" with all its materials, submissions, and enrollments?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          const { data: mats } = await supabase.from('materials').select('id, file_url').eq('course_id', course.id);
+          const ids = (mats ?? []).map((m) => m.id);
+          if (ids.length) {
+            const { data: subs } = await supabase.from('submissions').select('file_url').in('material_id', ids);
+            const paths = [...(mats ?? []), ...(subs ?? [])]
+              .filter((r) => r.file_url)
+              .map((r) => storagePath(r.file_url as string));
+            if (paths.length) await supabase.storage.from('lms-files').remove(paths);
+            await supabase.from('submissions').delete().in('material_id', ids);
+            await supabase.from('materials').delete().eq('course_id', course.id);
+          }
+          await supabase.from('enrollments').delete().eq('course_id', course.id);
+          const { error } = await supabase.from('courses').delete().eq('id', course.id);
+          if (error) Alert.alert('Error', error.message);
+          else load();
+        },
+      },
+    ]);
+
   const signOut = () => supabase.auth.signOut();
 
   if (loading) {
@@ -259,9 +290,24 @@ export default function Dashboard() {
         }
         renderItem={({ item }) => (
           <Pressable style={styles.card} onPress={() => router.push(`/course/${item.id}`)}>
-            <Text style={styles.cardTitle}>{item.title}</Text>
-            <Text style={styles.muted}>{item.code}</Text>
-            {isInstructor && <Text style={styles.joinCode}>Join code: {item.join_code}</Text>}
+            <View style={styles.cardRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardTitle}>{item.title}</Text>
+                <Text style={styles.muted}>{item.code}</Text>
+                {isInstructor && <Text style={styles.joinCode}>Join code: {item.join_code}</Text>}
+              </View>
+              {isInstructor && (
+                <Pressable
+                  style={styles.deleteBtn}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    deleteCourse(item);
+                  }}
+                >
+                  <Text style={styles.deleteBtnText}>Delete</Text>
+                </Pressable>
+              )}
+            </View>
           </Pressable>
         )}
       />
@@ -346,6 +392,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
+  cardRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   cardTitle: { fontSize: 16, fontWeight: '600', color: '#111827' },
   muted: { fontSize: 13, color: '#6b7280', marginTop: 2 },
   badge: {
@@ -361,6 +408,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   joinCode: { marginTop: 8, fontSize: 13, fontWeight: '600', color: '#059669' },
+  deleteBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#fee2e2',
+  },
+  deleteBtnText: { color: '#dc2626', fontWeight: '600', fontSize: 13 },
   overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
   sheet: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32 },
   sheetTitle: { fontSize: 18, fontWeight: '700', marginBottom: 14, color: '#111827' },
