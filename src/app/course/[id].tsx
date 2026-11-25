@@ -6,6 +6,7 @@ import {
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Linking from 'expo-linking';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { supabase } from '../../lib/supabase';
 import type { Course, Material } from '../../types/database';
 
@@ -25,7 +26,8 @@ export default function CourseScreen() {
 
   const [title, setTitle] = useState('');
   const [instructions, setInstructions] = useState('');
-  const [dueDate, setDueDate] = useState('');
+  const [dueDate, setDueDate] = useState<Date | null>(null);
+  const [pickerStep, setPickerStep] = useState<'date' | 'time' | null>(null);
   const [maxScore, setMaxScore] = useState('100');
   const [file, setFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
 
@@ -46,7 +48,36 @@ export default function CourseScreen() {
   useEffect(() => { load(); }, [load]);
 
   const resetForm = () => {
-    setTitle(''); setInstructions(''); setDueDate(''); setMaxScore('100'); setFile(null);
+    setTitle(''); setInstructions(''); setDueDate(null); setPickerStep(null);
+    setMaxScore('100'); setFile(null);
+  };
+
+  const openDatePicker = () => {
+    if (Platform.OS === 'ios' && !dueDate) setDueDate(new Date());
+    setPickerStep('date');
+  };
+
+  const onPickerChange = (e: DateTimePickerEvent, selected?: Date) => {
+    if (Platform.OS === 'ios') {
+      if (selected) setDueDate(selected);
+      return;
+    }
+    if (e.type !== 'set' || !selected) {
+      setPickerStep(null);
+      return;
+    }
+    if (pickerStep === 'date') {
+      const d = new Date(selected);
+      if (dueDate) d.setHours(dueDate.getHours(), dueDate.getMinutes(), 0, 0);
+      else d.setHours(23, 59, 0, 0);
+      setDueDate(d);
+      setPickerStep('time');
+    } else {
+      const d = new Date(dueDate ?? selected);
+      d.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
+      setDueDate(d);
+      setPickerStep(null);
+    }
   };
 
   const closeModal = () => { setModal(null); resetForm(); };
@@ -109,15 +140,7 @@ export default function CourseScreen() {
       Alert.alert('Missing info', 'Enter a title.');
       return;
     }
-    let due: string | null = null;
-    if (dueDate.trim()) {
-      const d = new Date(dueDate.trim().replace(' ', 'T'));
-      if (isNaN(d.getTime())) {
-        Alert.alert('Invalid date', 'Use YYYY-MM-DD or YYYY-MM-DD HH:mm.');
-        return;
-      }
-      due = d.toISOString();
-    }
+    const due = dueDate ? dueDate.toISOString() : null;
     const score = parseInt(maxScore, 10);
     if (isNaN(score) || score <= 0) {
       Alert.alert('Invalid score', 'Max score must be a positive number.');
@@ -248,13 +271,34 @@ export default function CourseScreen() {
                   onChangeText={setInstructions}
                   multiline
                 />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Due date (YYYY-MM-DD HH:mm) — optional"
-                  value={dueDate}
-                  onChangeText={setDueDate}
-                  autoCapitalize="none"
-                />
+                <View style={styles.dateRow}>
+                  <Pressable style={styles.dateBtn} onPress={openDatePicker}>
+                    <Text style={styles.dateText}>
+                      {dueDate ? `📅 ${dueDate.toLocaleString()}` : '📅 Set deadline (optional)'}
+                    </Text>
+                  </Pressable>
+                  {dueDate && (
+                    <Pressable onPress={() => { setDueDate(null); setPickerStep(null); }}>
+                      <Text style={styles.clearText}>Clear</Text>
+                    </Pressable>
+                  )}
+                </View>
+                {pickerStep && (
+                  <>
+                    <DateTimePicker
+                      value={dueDate ?? new Date()}
+                      mode={Platform.OS === 'ios' ? 'datetime' : pickerStep}
+                      display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                      minimumDate={new Date()}
+                      onChange={onPickerChange}
+                    />
+                    {Platform.OS === 'ios' && (
+                      <Pressable onPress={() => setPickerStep(null)}>
+                        <Text style={[styles.clearText, { textAlign: 'right', marginBottom: 10 }]}>Done</Text>
+                      </Pressable>
+                    )}
+                  </>
+                )}
                 <TextInput
                   style={styles.input}
                   placeholder="Max score"
@@ -335,6 +379,13 @@ const styles = StyleSheet.create({
     fontSize: 15, marginBottom: 10, backgroundColor: '#F9FAFB',
   },
   multiline: { minHeight: 80, textAlignVertical: 'top' },
+  dateRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 12 },
+  dateBtn: {
+    flex: 1, borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 10, padding: 12,
+    backgroundColor: '#F9FAFB',
+  },
+  dateText: { fontSize: 15, color: '#111827' },
+  clearText: { fontSize: 14, fontWeight: '600', color: '#2563EB' },
   pickBtn: {
     borderWidth: 1, borderColor: '#2563EB', borderStyle: 'dashed', borderRadius: 10,
     padding: 14, alignItems: 'center', marginBottom: 10,
