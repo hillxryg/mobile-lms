@@ -53,9 +53,18 @@ export default function CourseScreen() {
   };
 
   const openDatePicker = () => {
+    if (Platform.OS === 'web') {
+        const raw = window.prompt('Enter deadline (YYYY-MM-DD HH:mm):', '2026-12-01 23:59');
+        if (raw) {
+        const d = new Date(raw.replace(' ', 'T'));
+        if (!isNaN(d.getTime())) setDueDate(d);
+        else Alert.alert('Invalid date', 'Use YYYY-MM-DD HH:mm format.');
+        }
+        return;
+    }
     if (Platform.OS === 'ios' && !dueDate) setDueDate(new Date());
     setPickerStep('date');
-  };
+    };
 
   const onPickerChange = (e: DateTimePickerEvent, selected?: Date) => {
     if (Platform.OS === 'ios') {
